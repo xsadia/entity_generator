@@ -3,8 +3,8 @@ use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 use std::{fs, path::Path};
 
-const MAPPER_PATH: &str = "domain/entity/";
-const ENTITY_PATH: &str = "infra/database/prisma/mappers";
+const ENTITY_PATH: &str = "domain/entity/";
+const MAPPER_PATH: &str = "infra/database/prisma/mappers";
 
 pub enum ModuleType {
     Entity,
@@ -136,6 +136,18 @@ fn get_field_with_type(field: &Field, read_only: bool) -> Option<String> {
     }
 }
 
+fn to_kebab_case(name: &str) -> String {
+    let mut kebab_case_string = String::new();
+    for (i, ch) in name.chars().enumerate() {
+        if ch.is_uppercase() && i > 0 {
+            kebab_case_string.push('-');
+        }
+        kebab_case_string.push(ch.to_ascii_lowercase());
+    }
+
+    kebab_case_string
+}
+
 pub fn build_path(
     dir: &Path,
     module_path: &str,
@@ -151,7 +163,7 @@ pub fn build_path(
         dir.display(),
         module_path,
         path,
-        model_name,
+        to_kebab_case(model_name),
         file_extension
     )
 }
