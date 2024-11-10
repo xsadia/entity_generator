@@ -5,10 +5,38 @@ use std::{fs, path::Path};
 
 const ENTITY_PATH: &str = "domain/entity/";
 const MAPPER_PATH: &str = "infra/database/prisma/mappers";
+const REPOSITORY_PATH: &str = "app/repositories";
+const PRISMA_REPOSITORY_PATH: &str = "infra/database/prisma";
 
+#[derive(Debug)]
 pub enum ModuleType {
     Entity,
     Mapper,
+    Repository,
+    PrismaRepository,
+}
+
+impl From<&str> for ModuleType {
+    fn from(value: &str) -> Self {
+        match value {
+            "Entity" => ModuleType::Entity,
+            "Mapper" => ModuleType::Mapper,
+            "Repository" => ModuleType::Repository,
+            "Prisma repository" => ModuleType::PrismaRepository,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<ModuleType> for &str {
+    fn from(value: ModuleType) -> Self {
+        match value {
+            ModuleType::Entity => "Entity",
+            ModuleType::Mapper => "Mapper",
+            ModuleType::Repository => "Repository",
+            ModuleType::PrismaRepository => "Prisma repository",
+        }
+    }
 }
 
 fn lowercase_first_char(s: &str) -> String {
@@ -17,6 +45,15 @@ fn lowercase_first_char(s: &str) -> String {
         None => String::new(),
         Some(first) => first.to_lowercase().collect::<String>() + c.as_str(),
     }
+}
+
+pub fn create_repository(model: &Model) -> (String, String) {
+    let abstract_repository = format!("export abstract class {}Repository {{ }}", model.name);
+    let prisma_repository = format!(
+        "export class Prisma{}Repository implements {}Repository {{\n\tconstructor() {{ }}\n}}",
+        model.name, model.name
+    );
+    (abstract_repository, prisma_repository)
 }
 
 pub fn create_mapper(model: &Model) -> String {
@@ -154,21 +191,24 @@ pub fn build_path(
     module_type: ModuleType,
     model_name: &str,
 ) -> String {
-    let (path, file_extension) = match module_type {
-        ModuleType::Entity => (ENTITY_PATH, ".entity.ts"),
-        ModuleType::Mapper => (MAPPER_PATH, ".mapper.ts"),
+    let kebab_model_name = to_kebab_case(model_name);
+    let (path, file_name) = match module_type {
+        ModuleType::Entity => (ENTITY_PATH, format!("{}.entity.ts", kebab_model_name)),
+        ModuleType::Mapper => (MAPPER_PATH, format!("{}.mapper.ts", kebab_model_name)),
+        ModuleType::Repository => (
+            REPOSITORY_PATH,
+            format!("{}.repository.ts", kebab_model_name),
+        ),
+        ModuleType::PrismaRepository => (
+            PRISMA_REPOSITORY_PATH,
+            format!("prisma-{}.repository.ts", kebab_model_name),
+        ),
     };
-    format!(
-        "{}/{}{}/{}{}",
-        dir.display(),
-        module_path,
-        path,
-        to_kebab_case(model_name),
-        file_extension
-    )
+
+    format!("{}/{}{}/{}", dir.display(), module_path, path, file_name)
 }
 
-pub fn write_to_module<P: AsRef<Path>>(path: P, contents: String) -> std::io::Result<()> {
+fn write_to_module<P: AsRef<Path>>(path: P, contents: String) -> std::io::Result<()> {
     if let Some(parent) = path.as_ref().parent() {
         fs::create_dir_all(parent)?;
     }
@@ -177,4 +217,37 @@ pub fn write_to_module<P: AsRef<Path>>(path: P, contents: String) -> std::io::Re
     file.write_all(contents.as_bytes())?;
 
     Ok(())
+}
+
+pub fn write_modules(modules: Vec<ModuleType>, dir: &Path, module_path: &str, model: &Model) {
+    for module in modules {
+        match module {
+            ModuleType::Entity => write_to_module(
+                build_path(dir, module_path, ModuleType::Entity, &model.name),
+                create_entity(model),
+            )
+            .unwrap(),
+            ModuleType::Mapper => write_to_module(
+                build_path(dir, module_path, ModuleType::Mapper, &model.name),
+                create_mapper(model),
+            )
+            .unwrap(),
+            ModuleType::Repository => {
+                let (abstract_repository, prisma_repository) = create_repository(model);
+
+                write_to_module(
+                    build_path(dir, module_path, ModuleType::Repository, &model.name),
+                    abstract_repository,
+                )
+                .unwrap();
+
+                write_to_module(
+                    build_path(dir, module_path, ModuleType::PrismaRepository, &model.name),
+                    prisma_repository,
+                )
+                .unwrap();
+            }
+            _ => unreachable!(),
+        }
+    }
 }

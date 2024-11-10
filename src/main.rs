@@ -1,5 +1,5 @@
-use code_gen::{build_path, create_entity, create_mapper, write_to_module, ModuleType};
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use code_gen::{write_modules, ModuleType};
+use dialoguer::{theme::ColorfulTheme, FuzzySelect, MultiSelect};
 use parser::{get_schemas, parse_schema, TsConfig};
 use std::{
     env,
@@ -76,15 +76,25 @@ fn main() {
         .unwrap()
         .replace("*", "");
 
-    write_to_module(
-        build_path(&dir, &module_path, ModuleType::Entity, &selected_model.name),
-        create_entity(selected_model),
-    )
-    .unwrap();
+    let multiselected: &[&str; 3] = &[
+        ModuleType::Entity.into(),
+        ModuleType::Mapper.into(),
+        ModuleType::Repository.into(),
+    ];
 
-    write_to_module(
-        build_path(&dir, &module_path, ModuleType::Mapper, &selected_model.name),
-        create_mapper(selected_model),
-    )
-    .unwrap();
+    let defaults = &[true, false, false];
+
+    let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select which classes to create")
+        .items(&multiselected[..])
+        .defaults(&defaults[..])
+        .interact()
+        .unwrap();
+
+    let selected_modules: Vec<ModuleType> = selections
+        .iter()
+        .map(|i| ModuleType::from(*multiselected.get(*i).unwrap()))
+        .collect();
+
+    write_modules(selected_modules, &dir, &module_path, selected_model)
 }
