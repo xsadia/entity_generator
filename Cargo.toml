@@ -1,0 +1,10 @@
+[package]
+name = "entity-generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dialoguer = { version = "0.11.0", features = ["fuzzy-select"] }
+serde = { version = "1.0.214", features = ["derive"]}
+serde_json = "1.0.132"
+
