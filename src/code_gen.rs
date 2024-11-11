@@ -276,7 +276,15 @@ fn create_mapper(model: &Model) -> String {
 
     for field in &model.fields {
         if get_field_with_type(field, false).is_some() {
-            write!(mapper, "\n\t\t\t{}: data.{},", field.name, field.name).unwrap();
+            match field.field_type.as_str() {
+                "Decimal" | "BigInt" => write!(
+                    mapper,
+                    "\n\t\t\t{}: Number(data.{}),",
+                    field.name, field.name
+                )
+                .unwrap(),
+                _ => write!(mapper, "\n\t\t\t{}: data.{},", field.name, field.name).unwrap(),
+            }
         }
     }
 
