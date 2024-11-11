@@ -1,6 +1,6 @@
 # entity-generator
 
-`entity-generator` is a command-line tool written in Rust that reads your Prisma schema file and automatically generates TypeScript classes for mappers, entities, and repositories. This tool is designed to streamline the process of setting up a structured data layer in your TypeScript applications, saving time and reducing the need for repetitive coding.
+`entity-generator` is a command-line tool that reads your Prisma schema file and automatically generates TypeScript classes for mappers, entities, and repositories. This tool is designed to streamline the process of setting up a structured data layer in your TypeScript applications, saving time and reducing the need for repetitive coding.
 
 ## Features
 
