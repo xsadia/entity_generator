@@ -93,7 +93,7 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         }
         RepositoryOperations::Delete => format!(
             r#"async delete(id: string) {{
-    await this.prisma.{}.upadte({{
+    await this.prisma.{}.update({{
       where: {{
         id,
       }},
