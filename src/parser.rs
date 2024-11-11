@@ -7,20 +7,17 @@ use std::{
 
 use serde::Deserialize;
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct TsConfigCompilerOptions {
     pub paths: HashMap<String, Vec<String>>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct TsConfig {
     #[serde(rename(deserialize = "compilerOptions"))]
     pub compiler_options: TsConfigCompilerOptions,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Field {
     pub name: String,
@@ -28,7 +25,6 @@ pub struct Field {
     pub is_optional: bool,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Model {
     pub name: String,

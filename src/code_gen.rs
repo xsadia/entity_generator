@@ -8,7 +8,7 @@ const MAPPER_PATH: &str = "infra/database/prisma/mappers";
 const REPOSITORY_PATH: &str = "app/repositories";
 const PRISMA_REPOSITORY_PATH: &str = "infra/database/prisma";
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ModuleType {
     Entity,
     Mapper,
@@ -47,16 +47,225 @@ fn lowercase_first_char(s: &str) -> String {
     }
 }
 
-pub fn create_repository(model: &Model) -> (String, String) {
-    let abstract_repository = format!("export abstract class {}Repository {{ }}", model.name);
-    let prisma_repository = format!(
-        "export class Prisma{}Repository implements {}Repository {{\n\tconstructor() {{ }}\n}}",
-        model.name, model.name
+enum RepositoryOperations {
+    Create,
+    Find,
+    FindMany,
+    Delete,
+    Update,
+}
+
+fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOperations) -> String {
+    match op {
+        RepositoryOperations::Create => {
+            let mut method = format!(
+                "async create(data: {}): Promise<{}> {{\n",
+                model.name, model.name
+            );
+            if has_mapper {
+                write!(
+                    method,
+                    r#"    const result = await this.prisma.{}.create({{
+      data,
+    }})
+
+    return {}Mapper.toDomain(result)
+  }}"#,
+                    lowercase_first_char(&model.name),
+                    model.name
+                )
+                .unwrap();
+
+                return method;
+            }
+
+            write!(
+                method,
+                r#"      return this.prisma.{}.create({{
+        data,
+      }})
+  }}"#,
+                lowercase_first_char(&model.name)
+            )
+            .unwrap();
+
+            method
+        }
+        RepositoryOperations::Delete => format!(
+            r#"async delete(id: string) {{
+    await this.prisma.{}.upadte({{
+      where: {{
+        id,
+      }},
+      data: {{
+        deletedAt: new Date(),
+      }},
+    }})
+  }}"#,
+            lowercase_first_char(&model.name)
+        ),
+        RepositoryOperations::Find => {
+            let mut method = format!(
+                "async find(data: Partial<{}>): Promise<{}> {{\n",
+                model.name, model.name
+            );
+
+            if has_mapper {
+                write!(
+                    method,
+                    r#"    const result = await this.prisma.{}.findFirst({{
+      where: data,
+    }})
+
+    return {}Mapper.toDomain(result)
+  }}"#,
+                    lowercase_first_char(&model.name),
+                    model.name
+                )
+                .unwrap();
+
+                return method;
+            }
+
+            write!(
+                method,
+                r#"      return this.prisma.{}.findFirst({{
+        where: data,
+      }})
+  }}"#,
+                lowercase_first_char(&model.name)
+            )
+            .unwrap();
+
+            method
+        }
+        RepositoryOperations::FindMany => {
+            let mut method = format!(
+                "async findMany(data: Partial<{}>): Promise<{}[]> {{\n",
+                model.name, model.name
+            );
+
+            if has_mapper {
+                write!(
+                    method,
+                    r#"    const result = await this.prisma.{}.findMany({{
+      where: data,
+    }})
+
+    return result.map({}Mapper.toDomain)
+  }}"#,
+                    lowercase_first_char(&model.name),
+                    model.name
+                )
+                .unwrap();
+
+                return method;
+            }
+
+            write!(
+                method,
+                r#"      return this.prisma.{}.findMany({{
+        where: data,
+      }})
+  }}"#,
+                lowercase_first_char(&model.name)
+            )
+            .unwrap();
+
+            method
+        }
+        RepositoryOperations::Update => {
+            let mut method = format!(
+                "async update(id: string, data: Partial<{}>): Promise<{}> {{\n",
+                model.name, model.name
+            );
+
+            if has_mapper {
+                write!(
+                    method,
+                    r#"    const result = await this.prisma.{}.update({{
+      where: {{
+        id,
+      }},
+      data,
+    }})
+
+    return {}Mapper.toDomain(result)
+  }}"#,
+                    lowercase_first_char(&model.name),
+                    model.name
+                )
+                .unwrap();
+
+                return method;
+            }
+
+            write!(
+                method,
+                r#"      return this.prisma.{}.findMany({{
+        where: data,
+      }})
+  }}"#,
+                lowercase_first_char(&model.name)
+            )
+            .unwrap();
+
+            method
+        }
+    }
+}
+
+fn create_repository(model: &Model, has_mapper: bool) -> (String, String) {
+    let abstract_repository = format!(
+        r#"export abstract class {}Repository {{
+    abstract create(data: {}): Promise<{}>
+
+    abstract find(data: Partial<{}>): Promise<{}>
+
+    abstract findMany(data: Partial<{}>): Promise<{}[]>
+
+    abstract update(id: string, data: Partial<{}>): Promise<{}>
+
+    abstract delete(id: string): Promise<void>
+}}"#,
+        model.name,
+        model.name,
+        model.name,
+        model.name,
+        model.name,
+        model.name,
+        model.name,
+        model.name,
+        model.name
     );
+
+    let prisma_repository = format!(
+        r#"export class Prisma{}Repository implements {}Repository {{
+    constructor(private readonly prisma: PrismaService) {{}}
+
+  {}
+
+  {}
+
+  {}
+
+  {}
+
+  {}
+}}"#,
+        model.name,
+        model.name,
+        build_repository_methods(model, has_mapper, RepositoryOperations::Create),
+        build_repository_methods(model, has_mapper, RepositoryOperations::Find),
+        build_repository_methods(model, has_mapper, RepositoryOperations::FindMany),
+        build_repository_methods(model, has_mapper, RepositoryOperations::Update),
+        build_repository_methods(model, has_mapper, RepositoryOperations::Delete)
+    );
+
     (abstract_repository, prisma_repository)
 }
 
-pub fn create_mapper(model: &Model) -> String {
+fn create_mapper(model: &Model) -> String {
     let mut mapper = String::new();
     write!(
         mapper,
@@ -76,7 +285,7 @@ pub fn create_mapper(model: &Model) -> String {
     mapper
 }
 
-pub fn create_entity(model: &Model) -> String {
+fn create_entity(model: &Model) -> String {
     let entity_interface = String::from("I") + &model.name;
     let mut entity = String::new();
 
@@ -185,12 +394,7 @@ fn to_kebab_case(name: &str) -> String {
     kebab_case_string
 }
 
-pub fn build_path(
-    dir: &Path,
-    module_path: &str,
-    module_type: ModuleType,
-    model_name: &str,
-) -> String {
+fn build_path(dir: &Path, module_path: &str, module_type: ModuleType, model_name: &str) -> String {
     let kebab_model_name = to_kebab_case(model_name);
     let (path, file_name) = match module_type {
         ModuleType::Entity => (ENTITY_PATH, format!("{}.entity.ts", kebab_model_name)),
@@ -220,7 +424,7 @@ fn write_to_module<P: AsRef<Path>>(path: P, contents: String) -> std::io::Result
 }
 
 pub fn write_modules(modules: Vec<ModuleType>, dir: &Path, module_path: &str, model: &Model) {
-    for module in modules {
+    for module in &modules {
         match module {
             ModuleType::Entity => write_to_module(
                 build_path(dir, module_path, ModuleType::Entity, &model.name),
@@ -233,7 +437,8 @@ pub fn write_modules(modules: Vec<ModuleType>, dir: &Path, module_path: &str, mo
             )
             .unwrap(),
             ModuleType::Repository => {
-                let (abstract_repository, prisma_repository) = create_repository(model);
+                let (abstract_repository, prisma_repository) =
+                    create_repository(model, modules.contains(&ModuleType::Mapper));
 
                 write_to_module(
                     build_path(dir, module_path, ModuleType::Repository, &model.name),
