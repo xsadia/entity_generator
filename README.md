@@ -13,13 +13,18 @@
 ## Installation
 
 Download the latest release from [Releases](https://github.com/xsadia/entity_generator/releases) and add the binary to your system's PATH.
+```
+wget https://github.com/xsadia/entity_generator/releases/download/v1.4/entity-generator-linux-x64.tar.gz
+tar -xzf entity-generator-linux-x64.tar.gz
+sudo mv entity-generator /usr/local/bin
+```
 
 ## Usage
 
 Run the following command in the root of your project and choose the model you want to create an entity, mapper or repository of and choose the output module:
 
 ```
-entity_generator
+entity-generator
 ```
 
 # Demo
