@@ -261,38 +261,38 @@ export class Prisma{}Repository implements {}Repository {{
         match method {
             RepositoryOperations::Create => write!(
                 abstract_repository,
-                "\n\t\tabstract create(data: {}): Promise<{}>",
+                "\n    abstract create(data: {}): Promise<{}>",
                 input_type, return_type
             )
             .unwrap(),
             RepositoryOperations::Find => write!(
                 abstract_repository,
-                "\n\t\tabstract find(data: {}): Promise<{}>",
+                "\n    abstract find(data: {}): Promise<{}>",
                 input_type, return_type
             )
             .unwrap(),
             RepositoryOperations::FindMany => write!(
                 abstract_repository,
-                "\n\t\tabstract findMany(data: {}): Promise<{}[]>",
+                "\n    abstract findMany(data: {}): Promise<{}[]>",
                 input_type, return_type
             )
             .unwrap(),
             RepositoryOperations::Update => write!(
                 abstract_repository,
-                "\n\t\tabstract update(id: string, data: {}): Promise<{}>",
+                "\n    abstract update(id: string, data: {}): Promise<{}>",
                 input_type, return_type
             )
             .unwrap(),
             RepositoryOperations::Delete => write!(
                 abstract_repository,
-                "\n\t\tabstract delete(id: string): Promise<void>"
+                "\n    abstract delete(id: string): Promise<void>"
             )
             .unwrap(),
         }
 
         write!(
             prisma_repository,
-            "\n\t\t{}",
+            "\n    {}",
             build_repository_methods(&model.name, &input_type, &return_type, has_mapper, method)
         )
         .unwrap();
@@ -308,7 +308,7 @@ fn create_mapper(model: &Model) -> String {
     let mut mapper = String::new();
     write!(
         mapper,
-        "export class {}Mapper {{\n\tstatic toDomain(data: Prisma{}): {} {{\n\t\treturn new {}({{",
+        "export class {}Mapper {{\n  static toDomain(data: Prisma{}): {} {{\n    return new {}({{",
         model.name, model.name, model.name, model.name
     )
     .unwrap();
@@ -318,16 +318,16 @@ fn create_mapper(model: &Model) -> String {
             match field.field_type.as_str() {
                 "Decimal" | "BigInt" => write!(
                     mapper,
-                    "\n\t\t\t{}: Number(data.{}),",
+                    "\n      {}: Number(data.{}),",
                     field.name, field.name
                 )
                 .unwrap(),
-                _ => write!(mapper, "\n\t\t\t{}: data.{},", field.name, field.name).unwrap(),
+                _ => write!(mapper, "\n      {}: data.{},", field.name, field.name).unwrap(),
             }
         }
     }
 
-    write!(mapper, "\n\t\t}})\n\t}}\n}}").unwrap();
+    write!(mapper, "\n    }})\n  }}\n}}").unwrap();
 
     mapper
 }
@@ -366,7 +366,7 @@ fn create_entity(model: &Model) -> String {
 
     writeln!(
         entity,
-        "\n\n\tconstructor({}: {}) {{\n\t\tObject.assign(this, {})\n\t}}\n}}",
+        "\n\n  constructor({}: {}) {{\n    Object.assign(this, {})\n  }}\n}}",
         param_name, entity_interface, param_name,
     )
     .unwrap();
@@ -384,12 +384,12 @@ fn build_type_string(
     if read_only {
         write!(
             formatted_field_type,
-            "\n\treadonly {}: {}",
+            "\n  readonly {}: {}",
             field_name, field_type
         )
         .unwrap();
     } else {
-        write!(formatted_field_type, "\n\t{}: {}", field_name, field_type).unwrap();
+        write!(formatted_field_type, "\n  {}: {}", field_name, field_type).unwrap();
     };
 
     if is_optional {
