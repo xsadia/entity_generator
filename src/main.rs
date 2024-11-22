@@ -1,4 +1,4 @@
-use code_gen::{write_modules, ModuleType};
+use code_gen::{write_modules, ModuleType, RepositoryOperations};
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, MultiSelect};
 use parser::{get_schemas, parse_schema, TsConfig};
 use std::{
@@ -79,7 +79,7 @@ fn main() {
     let multiselected: &[&str; 3] = &[
         ModuleType::Entity.into(),
         ModuleType::Mapper.into(),
-        ModuleType::Repository.into(),
+        ModuleType::Repository(None).into(),
     ];
 
     let defaults = &[true, false, false];
@@ -91,10 +91,39 @@ fn main() {
         .interact()
         .unwrap();
 
-    let selected_modules: Vec<ModuleType> = selections
+    let mut selected_modules: Vec<ModuleType> = selections
         .iter()
         .map(|i| ModuleType::from(*multiselected.get(*i).unwrap()))
         .collect();
+
+    if selected_modules.contains(&ModuleType::Repository(None)) {
+        let methods: &[RepositoryOperations; 5] = &[
+            RepositoryOperations::Find,
+            RepositoryOperations::FindMany,
+            RepositoryOperations::Create,
+            RepositoryOperations::Delete,
+            RepositoryOperations::Update,
+        ];
+
+        let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select which repository methods to create")
+            .items(&methods[..])
+            .defaults(&defaults[..])
+            .interact()
+            .unwrap();
+
+        let selected_repositories: Vec<RepositoryOperations> = selections
+            .iter()
+            .map(|&i| methods.get(i).unwrap().clone())
+            .collect();
+
+        let index = selected_modules
+            .iter()
+            .position(|item| *item == ModuleType::Repository(None))
+            .unwrap();
+
+        selected_modules[index] = ModuleType::Repository(Some(selected_repositories))
+    };
 
     write_modules(selected_modules, &dir, &module_path, selected_model)
 }

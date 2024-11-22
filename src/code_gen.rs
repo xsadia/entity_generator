@@ -1,4 +1,5 @@
 use crate::parser::{Field, Model};
+use core::fmt;
 use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 use std::{fs, path::Path};
@@ -8,11 +9,11 @@ const MAPPER_PATH: &str = "infra/database/prisma/mappers";
 const REPOSITORY_PATH: &str = "app/repositories";
 const PRISMA_REPOSITORY_PATH: &str = "infra/database/prisma";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ModuleType {
     Entity,
     Mapper,
-    Repository,
+    Repository(Option<Vec<RepositoryOperations>>),
     PrismaRepository,
 }
 
@@ -21,7 +22,7 @@ impl From<&str> for ModuleType {
         match value {
             "Entity" => ModuleType::Entity,
             "Mapper" => ModuleType::Mapper,
-            "Repository" => ModuleType::Repository,
+            "Repository" => ModuleType::Repository(None),
             "Prisma repository" => ModuleType::PrismaRepository,
             _ => unreachable!(),
         }
@@ -33,7 +34,7 @@ impl From<ModuleType> for &str {
         match value {
             ModuleType::Entity => "Entity",
             ModuleType::Mapper => "Mapper",
-            ModuleType::Repository => "Repository",
+            ModuleType::Repository(_) => "Repository",
             ModuleType::PrismaRepository => "Prisma repository",
         }
     }
@@ -47,7 +48,8 @@ fn lowercase_first_char(s: &str) -> String {
     }
 }
 
-enum RepositoryOperations {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepositoryOperations {
     Create,
     Find,
     FindMany,
@@ -55,12 +57,30 @@ enum RepositoryOperations {
     Update,
 }
 
-fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOperations) -> String {
+impl fmt::Display for RepositoryOperations {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RepositoryOperations::Create => write!(f, "create"),
+            RepositoryOperations::Find => write!(f, "find"),
+            RepositoryOperations::FindMany => write!(f, "findMany"),
+            RepositoryOperations::Delete => write!(f, "delete"),
+            RepositoryOperations::Update => write!(f, "update"),
+        }
+    }
+}
+
+fn build_repository_methods(
+    model_name: &str,
+    input_type: &str,
+    return_type: &str,
+    has_mapper: bool,
+    op: &RepositoryOperations,
+) -> String {
     match op {
         RepositoryOperations::Create => {
             let mut method = format!(
                 "async create(data: {}): Promise<{}> {{\n",
-                model.name, model.name
+                input_type, return_type
             );
             if has_mapper {
                 write!(
@@ -71,8 +91,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
 
     return {}Mapper.toDomain(result)
   }}"#,
-                    lowercase_first_char(&model.name),
-                    model.name
+                    lowercase_first_char(model_name),
+                    model_name
                 )
                 .unwrap();
 
@@ -85,7 +105,7 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         data,
       }})
   }}"#,
-                lowercase_first_char(&model.name)
+                lowercase_first_char(model_name)
             )
             .unwrap();
 
@@ -102,12 +122,12 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
       }},
     }})
   }}"#,
-            lowercase_first_char(&model.name)
+            lowercase_first_char(model_name)
         ),
         RepositoryOperations::Find => {
             let mut method = format!(
-                "async find(data: Partial<{}>): Promise<{}> {{\n",
-                model.name, model.name
+                "async find(data: {}): Promise<{}> {{\n",
+                input_type, return_type
             );
 
             if has_mapper {
@@ -119,8 +139,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
 
     return {}Mapper.toDomain(result)
   }}"#,
-                    lowercase_first_char(&model.name),
-                    model.name
+                    lowercase_first_char(model_name),
+                    model_name
                 )
                 .unwrap();
 
@@ -133,7 +153,7 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         where: data,
       }})
   }}"#,
-                lowercase_first_char(&model.name)
+                lowercase_first_char(model_name)
             )
             .unwrap();
 
@@ -141,8 +161,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         }
         RepositoryOperations::FindMany => {
             let mut method = format!(
-                "async findMany(data: Partial<{}>): Promise<{}[]> {{\n",
-                model.name, model.name
+                "async findMany(data: {}): Promise<{}[]> {{\n",
+                input_type, return_type
             );
 
             if has_mapper {
@@ -154,8 +174,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
 
     return result.map({}Mapper.toDomain)
   }}"#,
-                    lowercase_first_char(&model.name),
-                    model.name
+                    lowercase_first_char(model_name),
+                    model_name
                 )
                 .unwrap();
 
@@ -168,7 +188,7 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         where: data,
       }})
   }}"#,
-                lowercase_first_char(&model.name)
+                lowercase_first_char(model_name)
             )
             .unwrap();
 
@@ -176,8 +196,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         }
         RepositoryOperations::Update => {
             let mut method = format!(
-                "async update(id: string, data: Partial<{}>): Promise<{}> {{\n",
-                model.name, model.name
+                "async update(id: string, data: {}): Promise<{}> {{\n",
+                input_type, return_type
             );
 
             if has_mapper {
@@ -192,8 +212,8 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
 
     return {}Mapper.toDomain(result)
   }}"#,
-                    lowercase_first_char(&model.name),
-                    model.name
+                    lowercase_first_char(model_name),
+                    model_name
                 )
                 .unwrap();
 
@@ -206,7 +226,7 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
         where: data,
       }})
   }}"#,
-                lowercase_first_char(&model.name)
+                lowercase_first_char(model_name)
             )
             .unwrap();
 
@@ -215,52 +235,71 @@ fn build_repository_methods(model: &Model, has_mapper: bool, op: RepositoryOpera
     }
 }
 
-fn create_repository(model: &Model, has_mapper: bool) -> (String, String) {
-    let abstract_repository = format!(
-        r#"export abstract class {}Repository {{
-    abstract create(data: {}): Promise<{}>
-
-    abstract find(data: Partial<{}>): Promise<{}>
-
-    abstract findMany(data: Partial<{}>): Promise<{}[]>
-
-    abstract update(id: string, data: Partial<{}>): Promise<{}>
-
-    abstract delete(id: string): Promise<void>
-}}"#,
-        model.name,
-        model.name,
-        model.name,
-        model.name,
-        model.name,
-        model.name,
-        model.name,
-        model.name,
-        model.name
+fn create_repository(
+    model: &Model,
+    methods: Option<Vec<RepositoryOperations>>,
+    has_mapper: bool,
+    has_entity: bool,
+) -> (String, String) {
+    let mut abstract_repository = format!("export abstract class {}Repository {{", model.name);
+    let mut prisma_repository = format!(
+        r#"@Injectable()
+export class Prisma{}Repository implements {}Repository {{
+    constructor(private readonly prisma: PrismaService) {{}}"#,
+        model.name, model.name
     );
 
-    let prisma_repository = format!(
-        r#"export class Prisma{}Repository implements {}Repository {{
-    constructor(private readonly prisma: PrismaService) {{}}
+    let (input_type, return_type) = if has_entity {
+        (format!("Partial<{}>", model.name), model.name.clone())
+    } else {
+        ("any".to_string(), "any".to_string())
+    };
 
-  {}
+    let methods = methods.unwrap_or_default();
 
-  {}
+    for method in &methods {
+        match method {
+            RepositoryOperations::Create => write!(
+                abstract_repository,
+                "\n\t\tabstract create(data: {}): Promise<{}>",
+                input_type, return_type
+            )
+            .unwrap(),
+            RepositoryOperations::Find => write!(
+                abstract_repository,
+                "\n\t\tabstract find(data: {}): Promise<{}>",
+                input_type, return_type
+            )
+            .unwrap(),
+            RepositoryOperations::FindMany => write!(
+                abstract_repository,
+                "\n\t\tabstract findMany(data: {}): Promise<{}[]>",
+                input_type, return_type
+            )
+            .unwrap(),
+            RepositoryOperations::Update => write!(
+                abstract_repository,
+                "\n\t\tabstract update(id: string, data: {}): Promise<{}>",
+                input_type, return_type
+            )
+            .unwrap(),
+            RepositoryOperations::Delete => write!(
+                abstract_repository,
+                "\n\t\tabstract delete(id: string): Promise<void>"
+            )
+            .unwrap(),
+        }
 
-  {}
+        write!(
+            prisma_repository,
+            "\n\t\t{}",
+            build_repository_methods(&model.name, &input_type, &return_type, has_mapper, method)
+        )
+        .unwrap();
+    }
 
-  {}
-
-  {}
-}}"#,
-        model.name,
-        model.name,
-        build_repository_methods(model, has_mapper, RepositoryOperations::Create),
-        build_repository_methods(model, has_mapper, RepositoryOperations::Find),
-        build_repository_methods(model, has_mapper, RepositoryOperations::FindMany),
-        build_repository_methods(model, has_mapper, RepositoryOperations::Update),
-        build_repository_methods(model, has_mapper, RepositoryOperations::Delete)
-    );
+    write!(abstract_repository, "\n}}").unwrap();
+    write!(prisma_repository, "\n}}").unwrap();
 
     (abstract_repository, prisma_repository)
 }
@@ -407,7 +446,7 @@ fn build_path(dir: &Path, module_path: &str, module_type: ModuleType, model_name
     let (path, file_name) = match module_type {
         ModuleType::Entity => (ENTITY_PATH, format!("{}.entity.ts", kebab_model_name)),
         ModuleType::Mapper => (MAPPER_PATH, format!("{}.mapper.ts", kebab_model_name)),
-        ModuleType::Repository => (
+        ModuleType::Repository(_) => (
             REPOSITORY_PATH,
             format!("{}.repository.ts", kebab_model_name),
         ),
@@ -444,12 +483,16 @@ pub fn write_modules(modules: Vec<ModuleType>, dir: &Path, module_path: &str, mo
                 create_mapper(model),
             )
             .unwrap(),
-            ModuleType::Repository => {
-                let (abstract_repository, prisma_repository) =
-                    create_repository(model, modules.contains(&ModuleType::Mapper));
+            ModuleType::Repository(methods) => {
+                let (abstract_repository, prisma_repository) = create_repository(
+                    model,
+                    methods.clone(),
+                    modules.contains(&ModuleType::Mapper),
+                    modules.contains(&ModuleType::Entity),
+                );
 
                 write_to_module(
-                    build_path(dir, module_path, ModuleType::Repository, &model.name),
+                    build_path(dir, module_path, ModuleType::Repository(None), &model.name),
                     abstract_repository,
                 )
                 .unwrap();
