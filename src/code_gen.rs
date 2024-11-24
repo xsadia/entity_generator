@@ -263,7 +263,7 @@ export class Prisma{}Repository implements {}Repository {{
     } else {
         ("any".to_string(), "any".to_string())
     };
-    {}
+
     let methods = methods.unwrap_or_default();
 
     for method in &methods {
