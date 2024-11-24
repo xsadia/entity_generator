@@ -12,7 +12,9 @@ mod parser;
 
 fn main() {
     let dir = env::current_dir().unwrap();
-    let schemas = get_schemas(format!("{}/prisma", dir.display())).unwrap();
+
+    let schemas = get_schemas(format!("{}/prisma", dir.display()))
+        .unwrap_or_else(|_| panic!("prisma schema not found at path {}/prisma", dir.display()));
 
     let schema_file_names: Vec<String> = schemas
         .iter()
@@ -49,7 +51,8 @@ fn main() {
 
     let ts_config_content = fs::read_to_string(format!("{}/tsconfig.json", dir.display())).unwrap();
 
-    let ts_config: TsConfig = serde_json::from_str(&ts_config_content).unwrap();
+    let ts_config: TsConfig =
+        serde_json::from_str(&ts_config_content).unwrap_or_else(|_| TsConfig::default());
 
     let modules: Vec<String> = ts_config
         .compiler_options

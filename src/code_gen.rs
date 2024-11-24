@@ -78,9 +78,15 @@ fn build_repository_methods(
 ) -> String {
     match op {
         RepositoryOperations::Create => {
+            let create_input_type = if input_type == "any" {
+                input_type
+            } else {
+                model_name
+            };
+
             let mut method = format!(
                 "async create(data: {}): Promise<{}> {{\n",
-                input_type, return_type
+                create_input_type, return_type
             );
             if has_mapper {
                 write!(
@@ -222,8 +228,11 @@ fn build_repository_methods(
 
             write!(
                 method,
-                r#"      return this.prisma.{}.findMany({{
-        where: data,
+                r#"      return this.prisma.{}.update({{
+        where: {{
+          id,
+        }},
+        data,
       }})
   }}"#,
                 lowercase_first_char(model_name)
@@ -259,12 +268,15 @@ export class Prisma{}Repository implements {}Repository {{
 
     for method in &methods {
         match method {
-            RepositoryOperations::Create => write!(
-                abstract_repository,
-                "\n\t\tabstract create(data: {}): Promise<{}>",
-                input_type, return_type
-            )
-            .unwrap(),
+            RepositoryOperations::Create => {
+                let create_input_type = if has_entity { &model.name } else { &input_type };
+                write!(
+                    abstract_repository,
+                    "\n\t\tabstract create(data: {}): Promise<{}>",
+                    create_input_type, return_type
+                )
+                .unwrap()
+            }
             RepositoryOperations::Find => write!(
                 abstract_repository,
                 "\n\t\tabstract find(data: {}): Promise<{}>",
@@ -478,17 +490,23 @@ pub fn write_modules(modules: Vec<ModuleType>, dir: &Path, module_path: &str, mo
                 create_entity(model),
             )
             .unwrap(),
-            ModuleType::Mapper => write_to_module(
-                build_path(dir, module_path, ModuleType::Mapper, &model.name),
-                create_mapper(model),
-            )
-            .unwrap(),
+            ModuleType::Mapper => {
+                if modules.contains(&ModuleType::Entity) {
+                    write_to_module(
+                        build_path(dir, module_path, ModuleType::Mapper, &model.name),
+                        create_mapper(model),
+                    )
+                    .unwrap()
+                }
+            }
             ModuleType::Repository(methods) => {
+                let has_entity = modules.contains(&ModuleType::Entity);
+
                 let (abstract_repository, prisma_repository) = create_repository(
                     model,
                     methods.clone(),
-                    modules.contains(&ModuleType::Mapper),
-                    modules.contains(&ModuleType::Entity),
+                    modules.contains(&ModuleType::Mapper) && has_entity,
+                    has_entity,
                 );
 
                 write_to_module(

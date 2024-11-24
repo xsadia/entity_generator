@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{BufRead, BufReader},
+    io::{self, BufRead, BufReader},
     path::PathBuf,
 };
 
@@ -16,6 +16,16 @@ pub struct TsConfigCompilerOptions {
 pub struct TsConfig {
     #[serde(rename(deserialize = "compilerOptions"))]
     pub compiler_options: TsConfigCompilerOptions,
+}
+
+impl TsConfig {
+    pub fn default() -> Self {
+        let mut paths = HashMap::new();
+        paths.insert("@src/*".to_string(), Vec::from(["src/*".to_string()]));
+        TsConfig {
+            compiler_options: TsConfigCompilerOptions { paths },
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -88,11 +98,8 @@ fn parse_field(line: &str) -> Option<Field> {
     None
 }
 
-pub fn get_schemas(path: String) -> Result<Vec<PathBuf>, String> {
-    let entries = match fs::read_dir(path) {
-        Ok(entries) => entries,
-        Err(err) => return Err(err.to_string()),
-    };
+pub fn get_schemas(path: String) -> Result<Vec<PathBuf>, io::Error> {
+    let entries = fs::read_dir(path)?;
 
     let file_paths: Vec<_> = entries
         .filter_map(|entry| {
