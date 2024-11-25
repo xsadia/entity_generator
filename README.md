@@ -14,7 +14,7 @@
 
 Download the latest release from [Releases](https://github.com/xsadia/entity_generator/releases) and add the binary to your system's PATH.
 ```
-wget https://github.com/xsadia/entity_generator/releases/download/v1.4/entity-generator-linux-x64.tar.gz
+wget https://github.com/xsadia/entity_generator/releases/download/v1.6/entity-generator-linux-x64.tar.gz
 tar -xzf entity-generator-linux-x64.tar.gz
 sudo mv entity-generator /usr/local/bin
 ```
